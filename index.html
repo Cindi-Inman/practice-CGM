@@ -1,0 +1,1100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Practice CGM</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Practice CGM">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column phone app. Status header, reading dial, glucose trace, action grid; bottom tab bar. */
+:root{
+  --bg:#EDF1F3; --surface:#FFFFFF; --surface-2:#E2E8EB; --ink:#13202A; --muted:#566772; --line:#D2DBE0;
+  --accent:#0B6A80; --accent-ink:#FFFFFF; --accent-tint:rgba(11,106,128,.10);
+  --ok:#1C8456; --ok-tint:rgba(28,132,86,.13);
+  --low:#C02B38; --low-tint:rgba(192,43,56,.12);
+  --high:#A86D05; --high-tint:rgba(184,124,10,.15);
+  --font-ui:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C1317; --surface:#141F25; --surface-2:#1B2931; --ink:#E4ECF0; --muted:#93A4AE; --line:#26353E;
+  --accent:#53B6CB; --accent-ink:#04212A; --accent-tint:rgba(83,182,203,.14);
+  --ok:#3EC48A; --ok-tint:rgba(62,196,138,.15);
+  --low:#FF6E79; --low-tint:rgba(255,110,121,.16);
+  --high:#F0B445; --high-tint:rgba(240,180,69,.17);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1317; --surface:#141F25; --surface-2:#1B2931; --ink:#E4ECF0; --muted:#93A4AE; --line:#26353E;
+  --accent:#53B6CB; --accent-ink:#04212A; --accent-tint:rgba(83,182,203,.14);
+  --ok:#3EC48A; --ok-tint:rgba(62,196,138,.15);
+  --low:#FF6E79; --low-tint:rgba(255,110,121,.16);
+  --high:#F0B445; --high-tint:rgba(240,180,69,.17);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:1.15rem;font-weight:800}
+h3{font-size:.98rem;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.label{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 14px;font-weight:700;min-height:44px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--low);border-color:var(--low)}
+.btn.danger.armed{background:var(--low);color:var(--surface)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.small{min-height:34px;padding:6px 10px;font-size:.85rem}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--accent);padding-inline:6px}
+input[type=text],input[type=number],select{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:11px 12px;min-height:44px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>span{font-weight:700;font-size:.9rem}
+.hint{font-size:.83rem;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.check{display:flex;gap:10px;align-items:flex-start}
+.check input{width:22px;height:22px;margin-top:1px;accent-color:var(--accent);flex:none}
+.seg{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;white-space:nowrap;border:0;background:transparent;border-radius:8px;padding:7px 4px;font-weight:700;font-size:.85rem;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* Setup */
+#setup{padding-block:28px 40px}
+.brandmark{display:flex;align-items:center;gap:10px}
+.brandmark svg{flex:none}
+.disclaimer{font-size:.86rem;background:var(--accent-tint);border-radius:12px;padding:12px 14px}
+
+/* Main */
+#main{min-height:100%;padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:10px;padding-block:10px}
+#brand{border:0;background:none;padding:0;display:flex;align-items:center;gap:8px;font-weight:800;font-size:1rem}
+.clock{margin-left:auto;text-align:right;line-height:1.2}
+.clock .mono{font-size:.95rem;font-weight:600}
+.clock .day{font-size:.75rem;color:var(--muted);font-weight:600}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:10px;width:40px;height:40px;display:grid;place-items:center;flex:none}
+.testbar{background:var(--high-tint);border-bottom:1px solid var(--line)}
+.testbar .wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-block:8px;font-size:.85rem}
+.testbar strong{color:var(--high)}
+.notice{border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);background:var(--surface)}
+.notice .grow{flex:1;min-width:0}
+.notice.alert-urgent{background:var(--low);border-color:var(--low);color:var(--surface)}
+.notice.alert-low{background:var(--low-tint);border-color:var(--low)}
+.notice.alert-high{background:var(--high-tint);border-color:var(--high)}
+.notice.info{background:var(--accent-tint);border-color:transparent}
+.notice .btn{flex:none}
+.alert-urgent .btn{background:var(--surface);color:var(--low);border-color:var(--surface)}
+main.wrap{padding-block:14px}
+section.tab{display:flex;flex-direction:column;gap:14px}
+
+/* Reading dial */
+.reading{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.dial{width:148px;height:148px;border-radius:50%;display:grid;place-items:center;border:10px solid var(--ok);background:var(--surface);position:relative}
+.dial[data-s="low"],.dial[data-s="urgent"]{border-color:var(--low)}
+.dial[data-s="high"],.dial[data-s="above"]{border-color:var(--high)}
+.dial[data-s="none"]{border-color:var(--line)}
+.dial .val{font-size:2.9rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.dial .unit{font-size:.75rem;color:var(--muted);font-weight:700;text-align:center}
+.arrow{position:absolute;right:-14px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--surface);display:grid;place-items:center;font-size:1.3rem;font-weight:800;line-height:1}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-weight:800;font-size:.8rem;background:var(--ok-tint);color:var(--ok)}
+.pill[data-s="low"],.pill[data-s="urgent"]{background:var(--low-tint);color:var(--low)}
+.pill[data-s="high"],.pill[data-s="above"]{background:var(--high-tint);color:var(--high)}
+.pill[data-s="none"]{background:var(--surface-2);color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.78rem;font-weight:700;border-radius:8px;padding:3px 8px;background:var(--surface-2);color:var(--muted)}
+.chip.warn{background:var(--high-tint);color:var(--high)}
+
+/* Graph */
+.graphhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+#graph{width:100%;height:230px;display:block}
+#graph text{font-family:var(--font-data);font-size:10px;fill:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+/* Actions */
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.act{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:700;font-size:.83rem;min-height:76px}
+.act svg{color:var(--accent)}
+.act.lowtx svg{color:var(--low)}
+
+/* Lists */
+.msg{display:flex;flex-direction:column;gap:6px}
+.msg .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tag{font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;padding:2px 7px;background:var(--accent-tint);color:var(--accent)}
+.tag.reflect{background:var(--ok-tint);color:var(--ok)}
+.tag.device,.tag.surprise{background:var(--high-tint);color:var(--high)}
+.unread{width:9px;height:9px;border-radius:50%;background:var(--low);display:inline-block}
+.dayhead{margin-top:6px}
+.logitem{display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.logitem:last-child{border-bottom:0}
+.logitem .t{width:72px;flex:none;font-size:.83rem}
+.logitem .what{flex:1;min-width:0}
+.empty{text-align:center;padding:26px 10px;color:var(--muted)}
+
+/* Report */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{background:var(--surface-2);border-radius:12px;padding:12px}
+.stat .n{font-size:1.6rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .s{font-size:.78rem;color:var(--muted);font-weight:600}
+.tirbar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--surface-2)}
+.tirbar i{display:block;height:100%}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td.num{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+ul.fb{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px}
+
+/* Tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar .wrap{display:grid;grid-template-columns:repeat(4,1fr)}
+.tabbar button{border:0;background:none;padding:8px 2px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.72rem;font-weight:700;color:var(--muted);position:relative}
+.tabbar button[aria-current="page"]{color:var(--accent)}
+.badge{position:absolute;top:4px;left:calc(50% + 6px);background:var(--low);color:#fff;border-radius:999px;font-size:.66rem;min-width:17px;height:17px;display:grid;place-items:center;padding:0 4px}
+
+/* Sheet */
+.scrim{position:fixed;inset:0;background:rgba(5,12,16,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet .head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}
+.result{font-size:2.4rem;font-weight:800;font-variant-numeric:tabular-nums}
+.modal-severe{border:2px solid var(--low)}
+
+footer.disc{font-size:.75rem;color:var(--muted);text-align:center;padding-block:6px 4px}
+
+@media (prefers-reduced-motion: no-preference){
+  .notice.alert-urgent{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{50%{filter:brightness(1.12)}}
+}
+@media (max-width:380px){.reading{grid-template-columns:1fr;justify-items:center;text-align:center}.dial{width:136px;height:136px}}
+
+@media print{
+  body{background:#fff;color:#000}
+  .top,.tabbar,.testbar,#tab-now,#tab-msgs,#tab-log,.noprint,#soundBar,#alertArea{display:none!important}
+  #tab-report{display:flex!important}
+  .card{border:1px solid #bbb;break-inside:avoid}
+  #main{padding:0}
+}
+</style>
+
+<div id="setup" hidden>
+  <div class="wrap stack" style="gap:18px">
+    <div class="brandmark">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="14" fill="none" stroke="var(--accent)" stroke-width="5"/><circle cx="17" cy="17" r="4" fill="var(--accent)"/></svg>
+      <h1 style="font-size:1.5rem;font-weight:800">Practice CGM</h1>
+    </div>
+    <p>For the next week you will live as a person with type 1 diabetes. This app works like a continuous glucose monitor (CGM): it shows a new glucose reading every 5 minutes, based on what you eat, the insulin you choose to take, your activity, and the situations your instructor sends you.</p>
+    <form id="setupForm" class="card stack" novalidate>
+      <h2>About you</h2>
+      <label class="field"><span>Your name</span><input type="text" id="fName" autocomplete="name" required><small class="hint">Your name appears on the report you turn in.</small></label>
+      <div class="grid2">
+        <label class="field"><span>Age</span><input type="number" id="fAge" inputmode="numeric" min="16" max="90" required></label>
+        <label class="field"><span>Sex</span><select id="fSex"><option value="Female">Female</option><option value="Male">Male</option></select></label>
+      </div>
+      <div class="grid2">
+        <label class="field"><span>Weight (lb)</span><input type="number" id="fWeight" inputmode="decimal" min="80" max="450" required></label>
+        <label class="field"><span>Activity level</span><select id="fActivity"><option>Low</option><option selected>Moderate</option><option>High</option></select></label>
+      </div>
+      <label class="field"><span>Your week starts</span><select id="fWeek"></select><small class="hint">Scenario messages arrive Monday through Saturday of this week.</small></label>
+      <div class="card" style="background:var(--surface-2);border:0">
+        <p class="label" style="margin-bottom:6px">Your diabetes plan</p>
+        <p>Type 1 diabetes, diagnosed <strong>5 years ago</strong>.</p>
+        <p>Long-acting insulin: <strong>Lantus (glargine) <span id="fLantus">?</span> units once daily</strong>. It runs automatically in the background.</p>
+        <p>Rapid-acting insulin: <strong>NovoLog</strong> by injection for meals and corrections. You calculate every dose yourself.</p>
+      </div>
+      <label class="check"><input type="checkbox" id="fAgree"><span class="disclaimer" style="flex:1">For educational use only. Not medical advice. Do not use to make decisions about real diabetes care.</span></label>
+      <p id="setupErr" class="hint" style="color:var(--low)" hidden></p>
+      <button class="btn primary" type="submit" id="startBtn">Start my CGM</button>
+    </form>
+  </div>
+</div>
+
+<div id="main" hidden>
+  <header class="top">
+    <div class="wrap">
+      <button id="brand" type="button" aria-label="Practice CGM">
+        <svg width="24" height="24" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="14" fill="none" stroke="var(--accent)" stroke-width="5"/><circle cx="17" cy="17" r="4" fill="var(--accent)"/></svg>
+        <span>Practice CGM</span>
+      </button>
+      <div class="clock"><div class="mono" id="simTime">--</div><div class="day" id="dayLabel"></div></div>
+      <button class="iconbtn" id="profileBtn" type="button" aria-label="Profile and settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>
+      </button>
+    </div>
+  </header>
+  <div class="testbar" id="testBar" hidden>
+    <div class="wrap">
+      <strong>Test mode</strong>
+      <div class="seg" id="speedSeg" role="group" aria-label="Speed">
+        <button type="button" data-speed="1">Real time</button><button type="button" data-speed="60">60x</button><button type="button" data-speed="360">360x</button>
+      </div>
+      <button class="btn small" type="button" id="jump1">+1 hr</button>
+      <button class="btn small" type="button" id="jumpNext">Next message</button>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div id="soundBar" class="notice info noprint" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+      <div class="grow"><strong>Tap anywhere to turn on alert sounds.</strong><br><span class="hint">Your phone only plays alerts while this app is open on screen.</span></div>
+    </div>
+    <div id="alertArea" class="stack" style="margin-bottom:14px"></div>
+
+    <section class="tab" id="tab-now">
+      <div class="card reading">
+        <div class="dial" id="dial" data-s="none">
+          <div><div class="val" id="val">--</div><div class="unit">mg/dL</div></div>
+          <div class="arrow" id="arrow" aria-hidden="true">→</div>
+        </div>
+        <div class="stack" style="gap:8px;min-width:0">
+          <span class="pill" id="statusPill" data-s="none">Waiting</span>
+          <p id="trendText" class="muted" style="font-size:.9rem"></p>
+          <p id="updated" class="hint"></p>
+          <div class="chips" id="chips"></div>
+        </div>
+      </div>
+
+      <div class="card stack">
+        <div class="graphhead">
+          <h3>Glucose trend</h3>
+          <div class="seg" id="winSeg" role="group" aria-label="Graph window">
+            <button type="button" data-h="3">3h</button><button type="button" data-h="6">6h</button><button type="button" data-h="12">12h</button><button type="button" data-h="24">24h</button>
+          </div>
+        </div>
+        <svg id="graph" role="img" aria-label="Glucose readings over time"></svg>
+        <div class="legend"><span><i style="background:var(--ok)"></i>70 to 180</span><span><i style="background:var(--high)"></i>Above 180</span><span><i style="background:var(--low)"></i>Below 70</span><span><i style="background:var(--accent)"></i>Insulin</span><span><i style="background:var(--muted)"></i>Carbs</span></div>
+      </div>
+
+      <div class="actions">
+        <button class="act" type="button" data-log="carbs"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3c4 3 6 7 6 11a6 6 0 0 1-12 0c0-4 2-8 6-11z"/></svg>Carbs</button>
+        <button class="act" type="button" data-log="bolus"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 2 4 4M17 7l-9.5 9.5M14 4l6 6M5 19l-3 3M9.5 8.5l6 6M7 14l3 3"/></svg>Insulin</button>
+        <button class="act lowtx" type="button" data-log="treat"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v6M12 22a7 7 0 0 0 7-7c0-3-3-6-7-9-4 3-7 6-7 9a7 7 0 0 0 7 7z"/></svg>Treat a low</button>
+        <button class="act" type="button" data-log="finger"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3c3 4 5 7 5 10a5 5 0 0 1-10 0c0-3 2-6 5-10z"/><path d="M10 14a2 2 0 0 0 2 2"/></svg>Fingerstick</button>
+        <button class="act" type="button" data-log="exercise"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="14" cy="4" r="2"/><path d="m6 20 3-6 3 2 1 5M9 14l1-5 4 1 2 3h3M10 9 7 10l-2 3"/></svg>Activity</button>
+        <button class="act" type="button" data-log="more"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>More</button>
+      </div>
+      <p class="hint" style="text-align:center">Your plan: 1 unit NovoLog per 15 g carbs. 1 unit lowers glucose 50 mg/dL; correct down to 120.</p>
+    </section>
+
+    <section class="tab" id="tab-msgs" hidden></section>
+    <section class="tab" id="tab-log" hidden></section>
+    <section class="tab" id="tab-report" hidden></section>
+    <footer class="disc noprint">For educational use only. Not medical advice.</footer>
+  </main>
+
+  <nav class="tabbar" aria-label="Sections">
+    <div class="wrap">
+      <button type="button" data-tab="now" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Now</button>
+      <button type="button" data-tab="msgs"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>Messages<span class="badge" id="msgBadge" hidden>0</span></button>
+      <button type="button" data-tab="log"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Log</button>
+      <button type="button" data-tab="report"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Report</button>
+    </div>
+  </nav>
+</div>
+
+<div id="sheetRoot"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- Settings approved by the instructor ---------- */
+const CFG = {
+  ICR: 15,            // grams of carb covered by 1 unit NovoLog
+  CF: 50,             // mg/dL lowered by 1 unit NovoLog
+  TARGET: 120,        // correction target
+  DIA: 240,           // NovoLog duration of action, minutes
+  INS_PEAK: 75,       // minutes to peak action
+  BASAL_U_PER_KG: 0.25,
+  URGENT: 55, LOW: 70, RANGE_HI: 180, HIGH: 250,
+  FLOOR: 40, CEIL: 450, SHOW_MIN: 40, SHOW_MAX: 400,
+  STEP_MIN: 5,
+  AM: 8, PM: 17,
+  PEN_UNITS: 40,      // NovoLog left in the last pen during the insurance scenario
+  START_MIN: 80, START_MAX: 200,
+  SNOOZE_MIN: 30
+};
+const MIN = 60000, H = 60 * MIN, STEP = CFG.STEP_MIN * MIN;
+const KEY = 'practiceCGM.v1';
+const framed = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+
+/* ---------- Storage ---------- */
+let storageOK = true;
+function load() { try { const r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null; } catch (e) { storageOK = false; return null; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { storageOK = false; } }
+let S = load();
+
+/* ---------- Clock (real time, or sped up in test mode) ---------- */
+function now() { const c = S && S.clock; if (!c) return Date.now(); return c.anchorSim + (Date.now() - c.anchorReal) * c.speed; }
+function setClock(sim, speed) { S.clock = { anchorSim: sim, anchorReal: Date.now(), speed }; save(); }
+
+/* ---------- Helpers ---------- */
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function mondayOf(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function T(ws, d, h, m = 0) { const x = new Date(ws); x.setDate(x.getDate() + d); x.setHours(h, m, 0, 0); return x.getTime(); }
+function tri(a, p, D) { if (a < 0 || a >= D) return 0; return a < p ? 2 * a / (p * D) : 2 * (D - a) / (D * (D - p)); }
+const fmtTime = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const fmtDay = t => new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtDayLong = t => new Date(t).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function statusOf(v) { if (v == null) return 'none'; if (v < CFG.URGENT) return 'urgent'; if (v < CFG.LOW) return 'low'; if (v > CFG.HIGH) return 'high'; if (v > CFG.RANGE_HI) return 'above'; return 'in'; }
+const STATUS_LABEL = { urgent: 'Urgent low', low: 'Low', high: 'High', above: 'Above range', in: 'In range', none: 'Waiting' };
+const showVal = v => v <= CFG.SHOW_MIN ? 'LOW' : v >= CFG.SHOW_MAX ? 'HIGH' : String(v);
+const lantusUnits = lb => Math.round(lb * 0.4536 * CFG.BASAL_U_PER_KG);
+
+/* ---------- Scenario week ---------- */
+const REFLECT = [
+  [0, 'What surprised you most about checking your glucose all day? How did knowing your numbers change the way you thought about food today?'],
+  [1, 'Being sick raised your glucose even without eating. What are the key sick-day rules, and how would you explain them to a patient in plain language?'],
+  [1, 'How did it feel to manage diabetes while you felt unwell? What would make this even harder for a child, a teen, or an older adult living alone?'],
+  [2, 'If cost forced you to ration insulin, what tradeoffs would you make with food and activity? What resources could a dietitian point a patient toward?'],
+  [3, 'When did you trust your CGM, and when did you check with a fingerstick? What made you doubt a reading?'],
+  [3, 'How did planning ahead for a celebration meal compare with eating on the spot? What would you teach a patient about fitting treats into their plan?'],
+  [4, 'How did activity affect your readings during the activity and for hours afterward? What would you tell a client to do before, during, and after a workout?'],
+  [5, 'How did social situations (meals out, events, alcohol) affect your decisions today? Did you ever feel pressure to skip checking or dosing?'],
+  [5, 'Think about the alarms, interruptions, and decisions this week. How might this mental load affect someone\'s sleep, mood, school, or work?'],
+  [6, 'Look at your weekly report. What patterns do you see in your time in range, highs, and lows? Name one thing you would do differently, and one way this week will change how you counsel people with type 1 diabetes.']
+];
+
+function buildScript(P) {
+  const ws = P.weekStart, t = (d, h, m = 0) => T(ws, d, h, m);
+  const sc = { msgs: [], ramps: [], drifts: [], sens: [], fingers: [], locks: [], offsets: [], exer: [], supply: null, randoms: [] };
+  const M = (id, at, title, text, kind = 'scenario') => sc.msgs.push({ id, t: at, title, text, kind });
+  const AM = CFG.AM, PM = CFG.PM;
+
+  // Monday evening
+  sc.ramps.push({ t0: t(0, PM - 1, 30), t1: t(0, PM), v: 85 });
+  M('d1pm', t(0, PM), 'Dinner out with friends', 'Your blood sugar is 85 before dinner and you are going out with friends tonight for dinner. How many carbs do you plan to eat?');
+  sc.ramps.push({ t0: t(0, PM + 2, 30), t1: t(0, PM + 3, 30), v: 258 });
+  M('d1pm2', t(0, PM + 3, 30), 'Update: after dinner', 'Later, your blood sugar goes up to 258. How will you dose for this level of blood sugar?');
+  // Tuesday: flu
+  sc.ramps.push({ t0: t(1, AM - 3), t1: t(1, AM), v: 265 });
+  sc.drifts.push({ t0: t(1, AM), t1: t(1, PM - 1), r: 12 });
+  sc.sens.push({ t0: t(1, AM - 3), t1: t(1, PM), m: 0.6 });
+  M('d2am', t(1, AM), 'You have the flu', 'You wake up feeling achy, fatigued, and have a fever: you have the flu! You have no appetite and can barely get any liquids down. And despite that, your BS keeps spiking to 250 and higher. What should you do?');
+  sc.ramps.push({ t0: t(1, PM - 1), t1: t(1, PM), v: 100 });
+  sc.drifts.push({ t0: t(1, 21), t1: t(2, 4), r: -6 });
+  M('d2pm', t(1, PM), 'Feeling a little better', 'You still don\'t feel great, but your fever has broken and you are able to get some Gatorade down. Your BS is now hovering around 100. How can you manage it the rest of the evening and overnight so it doesn\'t go too low?');
+  // Wednesday: insurance
+  M('d3', t(2, AM), 'Insurance and insulin cost', 'Your insurance recently changed, and you now have to pay more out of pocket for your insulin. You also were recently laid off, so you are having a more difficult time affording your insulin. You look in the fridge and see you only have 1 injection pen left with fast acting insulin and you won\'t be able to get any more insulin for another 5 days. Your long-lasting insulin typically lasts you 6 days when paired with short acting, which would normally last you 9 days. How would you manage this situation?');
+  sc.supply = { t0: t(2, AM), t1: t(7, 0), units: CFG.PEN_UNITS };
+  // Wednesday night: rough night of lows, then rebound
+  sc.ramps.push({ t0: t(2, 23), t1: t(3, 1, 30), v: 62 });
+  sc.ramps.push({ t0: t(3, 2, 30), t1: t(3, 3), v: 78 });
+  sc.ramps.push({ t0: t(3, 4), t1: t(3, 5), v: 57 });
+  sc.ramps.push({ t0: t(3, 6), t1: t(3, AM), v: 220 });
+  M('d4am', t(3, AM), 'Wonky glucometer', 'After a rough night of low BS\'s you are now at 220, but your glucometer seems to be giving you goofy readings (the first test you got 460, the second was 180, the third was 220, which is what you decide to dose for). What do you need to do to remedy the wonky glucometer readings?');
+  sc.fingers.push({ t0: t(3, AM), t1: t(3, AM + 2, 30), vals: [460, 180, 220] });
+  // Thursday evening: birthday
+  sc.ramps.push({ t0: t(3, PM - 1, 30), t1: t(3, PM), v: 165 });
+  M('d4pm', t(3, PM), 'It\'s your birthday!', 'It\'s your birthday! You want some cake and ice cream to celebrate (of course!). Your BS is 165 before your dinner meal. How will you dose, and how will you change your meal carbohydrate choices?');
+  // Friday morning: dawn phenomenon
+  sc.ramps.push({ t0: t(3, 21, 30), t1: t(3, 22, 30), v: 130 });
+  sc.ramps.push({ t0: t(4, 3), t1: t(4, AM), v: 315 });
+  M('d5am', t(4, AM), 'Dawn phenomenon', 'You are experiencing something called the Dawn Phenomenon. Do a little research on what it is and what you can do about it, and write about it in your journal. Your nighttime BS before bed was 130, but this morning it\'s 315.');
+  // Friday evening: hot walk
+  sc.ramps.push({ t0: t(4, PM - 1), t1: t(4, PM), v: 378 });
+  M('d5pm', t(4, PM), 'Evening walk in the heat', 'It is hot and humid outside, but you decide to go on a 5 mile walk this evening with your new girlfriend, who is training for a 10k walk. Pre-walk your BS is 378. What should you do before you start the walk?');
+  sc.exer.push({ id: 'script-walk', t: t(4, PM, 15), min: 100, intensity: 'moderate', scripted: true });
+  sc.ramps.push({ t0: t(4, PM, 15), t1: t(4, PM + 2), v: 96 });
+  sc.drifts.push({ t0: t(4, 21), t1: t(5, 2), r: -8 });
+  M('d5pm2', t(4, PM + 2), 'Update: after the walk', 'Post walk your BS is 96. What do you expect will happen with your BS the rest of the night? How will you manage this?');
+  // Saturday
+  sc.ramps.push({ t0: t(5, AM - 1, 30), t1: t(5, AM), v: 120 });
+  M('d6am', t(5, AM), 'Family brunch', 'You are going to your traditional family Saturday brunch, where you typically eat more than usual. Current BS is 120. How are you going to plan for the day?');
+  sc.ramps.push({ t0: t(5, PM - 1, 30), t1: t(5, PM), v: 92 });
+  M('d6pm', t(5, PM), 'Beer festival', 'BS is 92 and you are feeling really hungry at dinner time. You are out with friends at a beer festival and forgot to bring any insulin with you. What can you do to manage your BS?');
+  sc.locks.push({ t0: t(5, PM), t1: t(5, 23), why: 'You left your insulin at home. You can\'t take insulin until you get back around 11:00 PM.' });
+  // Sunday morning: late-night eating
+  sc.ramps.push({ t0: t(6, 2), t1: t(6, AM), v: 384 });
+  M('d7am', t(6, AM), 'Late night, high morning', 'This morning your blood sugar is 384 because you were out late and ate around 2:00 AM. How will you correct, and what could you do differently next time?');
+  // Sunday
+  M('d7', t(6, 9), 'Last day of your week', 'Keep checking and logging today. Tonight, open the Report tab, look over your week, and export your report for your instructor.', 'info');
+
+  REFLECT.forEach(([d, q], i) => M('r' + i, t(d, 19, i % 2 ? 5 : 0), 'Tonight\'s reflection', q, 'reflect'));
+
+  // Surprise events (2 or 3 per week), fixed per student
+  const r = rng(P.seed ^ 0x9e3779b9);
+  const cands = {
+    compression: [t(5, 2), t(6, 1, 30), t(0, 2, 30)],
+    inaccurate: [t(2, 13), t(6, 11)],
+    surpriseLow: [t(0, 14), t(5, 13)],
+    stress: [t(3, 12), t(2, 15, 30)]
+  };
+  const types = Object.keys(cands);
+  for (let i = types.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [types[i], types[j]] = [types[j], types[i]]; }
+  const n = 2 + (r() < 0.5 ? 1 : 0);
+  for (const ty of types.slice(0, n)) {
+    const list = cands[ty]; let at = list[Math.floor(r() * list.length)];
+    if (at < P.createdAt) at = list.find(x => x > P.createdAt) || at;
+    sc.randoms.push({ type: ty, t: at });
+    if (ty === 'compression') sc.offsets.push({ t0: at, t1: at + 55 * MIN, amt: -50, kind: 'compression' });
+    if (ty === 'inaccurate') {
+      sc.offsets.push({ t0: at, t1: at + 3 * H, amt: 45, kind: 'inaccurate' });
+      M('rand-inacc', at + 20 * MIN, 'Sensor check', 'Your CGM reading may not be accurate right now. Check your blood sugar with a fingerstick before you make any dosing decisions.', 'device');
+    }
+    if (ty === 'surpriseLow') sc.drifts.push({ t0: at, t1: at + 75 * MIN, r: -45 });
+    if (ty === 'stress') {
+      sc.drifts.push({ t0: at, t1: at + 90 * MIN, r: 30 });
+      sc.sens.push({ t0: at, t1: at + 4 * H, m: 0.85 });
+      M('rand-stress', at, 'Surprise: stressful news', 'Your professor just announced a quiz this afternoon in your hardest class. Stress hormones can raise blood sugar. Keep an eye on your readings for the next few hours.', 'surprise');
+    }
+  }
+  sc.msgs.sort((a, b) => a.t - b.t);
+  return sc;
+}
+
+/* ---------- Glucose model ----------
+   True glucose changes every 5 minutes from: carbs (raise 50/15 = 3.3 mg/dL per gram),
+   NovoLog (lowers 50 mg/dL per unit over 4 hours), activity, alcohol, caffeine, stress,
+   illness, cycle phase, a daily dawn rise, liver release during lows, and scenario events.
+   Lantus is assumed to be the right dose, so it holds glucose steady by itself. */
+const EX = { light: { rate: .4, mult: 1.15, after: 6 }, moderate: { rate: .9, mult: 1.3, after: 18 }, vigorous: { rate: 1.3, mult: 1.4, after: 24 } };
+let SCRIPT = null;
+
+function simulate(until) {
+  const P = S.profile, sc = SCRIPT;
+  const t0 = Math.floor(P.createdAt / STEP) * STEP;
+  const evs = S.events.concat(sc.exer.map(e => ({ ...e, type: 'exercise' }))).sort((a, b) => a.t - b.t);
+  const cycles = evs.filter(e => e.type === 'cycle');
+  const r = rng(P.seed);
+  let G = P.startBG, noise = 0;
+  const pts = [], severe = [];
+  let inSevere = false;
+  const half = CFG.STEP_MIN / 2, k = CFG.CF / CFG.ICR;
+  for (let t = t0; t <= until; t += STEP) {
+    let d = 0, ins = 0, sm = 1, alcohol = false;
+    const dt = new Date(t), hr = dt.getHours() + dt.getMinutes() / 60;
+    if (hr >= 4 && hr < 7) d += 10 / 12;          // dawn rise
+    if (hr >= 11 && hr < 16) d -= 6 / 12;         // midday basal pattern
+    for (const e of evs) {
+      if (e.t > t) break;
+      const a = (t - e.t) / MIN + half;
+      switch (e.type) {
+        case 'carbs': { const fat = !!e.fat, p = fat ? 120 : 50, D = fat ? 330 : 180; if (a < D) d += e.g * k * (fat ? 1.15 : 1) * tri(a, p, D) * CFG.STEP_MIN; break; }
+        case 'treat': if (a < 60) d += e.g * k * tri(a, 15, 60) * CFG.STEP_MIN; break;
+        case 'bolus': if (a < CFG.DIA) ins += e.u * CFG.CF * tri(a, CFG.INS_PEAK, CFG.DIA) * CFG.STEP_MIN; break;
+        case 'exercise': {
+          const x = EX[e.intensity] || EX.moderate;
+          if (a < e.min) { d -= x.rate * CFG.STEP_MIN; sm *= 1.2; }
+          else if (a < e.min + x.after * 60) sm *= x.mult;
+          if (e.intensity !== 'light' && a >= e.min + 120 && a < e.min + 720) d -= 4 / 12;
+          break;
+        }
+        case 'alcohol': if (a < 720) { alcohol = true; if (a >= 180) d -= e.n * 4 / 12; } break;
+        case 'caffeine': if (a < 120) d += e.n * 6 / 12; if (a < 180) sm *= 0.95; break;
+        case 'stress': if (e.level === 'high') { if (a < 240) { d += 15 / 12; sm *= 0.8; } } else if (a < 180) { d += 8 / 12; sm *= 0.9; } break;
+        case 'missedBasal': if (a < 1440) d += Math.min(1, a / 360) * 20 / 12; break;
+        case 'lateBasal': if (a < e.h * 60) d += 10 / 12; break;
+      }
+    }
+    let luteal = false; for (const c of cycles) { if (c.t <= t) luteal = !!c.on; }
+    if (luteal) { sm *= 0.85; d += 2 / 12; }
+    for (const x of sc.drifts) if (t > x.t0 && t <= x.t1) d += x.r / 12;
+    for (const x of sc.sens) if (t > x.t0 && t <= x.t1) sm *= x.m;
+    if (G < 70 && !alcohol) d += (70 - G) * 0.04;  // liver glucose release
+    G += d - ins * sm;
+    for (const rp of sc.ramps) if (t > rp.t0 && t <= rp.t1) { const rem = Math.round((rp.t1 - t) / STEP) + 1; G += (rp.v - G) / rem; }
+    if (G < CFG.FLOOR) G = CFG.FLOOR;
+    if (G > CFG.CEIL) G = CFG.CEIL;
+    if (G <= CFG.FLOOR + 0.5 && !inSevere) { severe.push(t); inSevere = true; }
+    if (G > 60) inSevere = false;
+    noise = 0.8 * noise + gauss(r) * 1.8;
+    let off = 0, art = null;
+    for (const o of sc.offsets) if (t >= o.t0 && t < o.t1) {
+      const ramp = Math.min(1, (t - o.t0) / (15 * MIN), (o.t1 - t) / (10 * MIN));
+      off += o.amt * ramp; art = o.kind;
+    }
+    const cgm = Math.max(CFG.SHOW_MIN, Math.min(CFG.SHOW_MAX, Math.round(G + noise + off)));
+    pts.push({ t, g: G, cgm, art });
+  }
+  return { pts, severe };
+}
+
+/* ---------- App state ---------- */
+let SIM = { pts: [], severe: [] };
+let tab = 'now', winH = 3, lastStep = -1, lastAlert = null, lastBeep = 0, sheetOpen = null, seenMsgIds = new Set();
+let audio = null, soundWasOn = false, msgInit = false;
+
+function defaultState(profile) {
+  return { v: 1, profile, events: [], read: [], silenced: {}, clock: { anchorSim: 0, anchorReal: 0, speed: 1 }, test: false, lastSeen: profile.createdAt, severeSeen: 0, dismissed: [] };
+}
+
+/* ---------- Sound ---------- */
+function unlockAudio() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state !== 'running') audio.resume().then(updateSoundBar, () => {});
+  } catch (e) {}
+  setTimeout(updateSoundBar, 50);
+}
+function soundOn() { return !!(audio && audio.state === 'running'); }
+function updateSoundBar() { const on = soundOn(); $('soundBar').hidden = on; if (on && !soundWasOn && lastAlert && !(S && S.silenced[lastAlert] > now())) playFor(lastAlert); soundWasOn = on; }
+function tones(freqs, dur = .18, gap = .1) {
+  if (!soundOn()) return;
+  let t = audio.currentTime + .02;
+  for (const f of freqs) {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + dur + .03); t += dur + gap;
+  }
+}
+function playFor(kind) {
+  const pat = { urgent: [1047, 1047, 1047, 1047], low: [880, 880], high: [523, 659], msg: [659, 880] }[kind];
+  if (pat) tones(pat);
+  try { if (navigator.vibrate) navigator.vibrate(kind === 'urgent' ? [300, 120, 300, 120, 300] : [200, 100, 200]); } catch (e) {}
+  lastBeep = Date.now();
+}
+document.addEventListener('pointerdown', unlockAudio, { passive: true });
+document.addEventListener('keydown', unlockAudio);
+
+/* ---------- Derived values ---------- */
+function curPt() { return SIM.pts.length ? SIM.pts[SIM.pts.length - 1] : null; }
+function trendOf() {
+  const p = SIM.pts, n = p.length; if (n < 4) return null;
+  const s = (p[n - 1].cgm - p[n - 4].cgm) / 15;
+  if (s > 3) return ['⇈', 'Rising quickly']; if (s > 2) return ['↑', 'Rising']; if (s > 1) return ['↗', 'Rising slowly'];
+  if (s >= -1) return ['→', 'Steady']; if (s >= -2) return ['↘', 'Falling slowly']; if (s >= -3) return ['↓', 'Falling']; return ['⇊', 'Falling quickly'];
+}
+function trueAt(t) {
+  const p = SIM.pts; if (!p.length) return S.profile.startBG;
+  let best = p[0]; for (const x of p) { if (x.t <= t) best = x; else break; } return best.g;
+}
+function activeLock(t) { return SCRIPT.locks.find(l => t >= l.t0 && t < l.t1); }
+function supplyLeft(t) {
+  const s = SCRIPT.supply; if (!s || t < s.t0 || t >= s.t1) return null;
+  const used = S.events.filter(e => e.type === 'bolus' && e.t >= s.t0 && e.t < s.t1).reduce((a, e) => a + e.u, 0);
+  return Math.max(0, Math.round((s.units - used) * 10) / 10);
+}
+function arrivedMsgs() { const n = now(); return SCRIPT.msgs.filter(m => m.t <= n && m.t >= S.profile.createdAt - 12 * H); }
+function unreadMsgs() { const read = new Set(S.read); return arrivedMsgs().filter(m => !read.has(m.id)); }
+function dayIndex(t) { const ws = S.profile.weekStart; for (let d = 6; d >= 0; d--) if (t >= T(ws, d, 0)) return d; return -1; }
+
+/* ---------- Rendering: Now ---------- */
+function renderHeader() {
+  const n = now();
+  $('simTime').textContent = fmtTime(n);
+  const d = dayIndex(n);
+  $('dayLabel').textContent = d < 0 ? 'Week starts ' + fmtDay(S.profile.weekStart) : (n >= T(S.profile.weekStart, 7, 0) ? 'Week complete' : 'Day ' + (d + 1) + ' of 7, ' + new Date(n).toLocaleDateString([], { weekday: 'short' }));
+  $('testBar').hidden = !S.test;
+  if (S.test) document.querySelectorAll('#speedSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.speed === S.clock.speed)));
+  const u = unreadMsgs().length; const b = $('msgBadge'); b.hidden = !u; b.textContent = u;
+}
+
+function renderNow() {
+  const p = curPt(), n = now();
+  const s = p ? statusOf(p.cgm) : 'none';
+  $('dial').dataset.s = s; $('statusPill').dataset.s = s;
+  $('val').textContent = p ? showVal(p.cgm) : '--';
+  $('statusPill').textContent = STATUS_LABEL[s];
+  const tr = trendOf();
+  $('arrow').textContent = tr ? tr[0] : '·';
+  $('trendText').textContent = tr ? tr[1] : 'Collecting readings';
+  $('updated').textContent = p ? 'Reading at ' + fmtTime(p.t) + '. Next in ' + Math.max(1, Math.ceil((p.t + STEP - n) / MIN)) + ' min.' : 'Your first reading arrives in a few minutes.';
+  const chips = [];
+  const left = supplyLeft(n); if (left != null) chips.push(`<span class="chip warn">NovoLog left: ${left} units</span>`);
+  const lk = activeLock(n); if (lk) chips.push(`<span class="chip warn">No insulin with you</span>`);
+  const luteal = (() => { let on = false; for (const e of S.events) if (e.type === 'cycle' && e.t <= n) on = !!e.on; return on; })();
+  if (luteal) chips.push('<span class="chip">Luteal phase</span>');
+  $('chips').innerHTML = chips.join('');
+  renderGraph();
+}
+
+function renderGraph() {
+  const svg = $('graph'); const W = Math.max(280, svg.clientWidth || 320), Hh = 230;
+  svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
+  const n = now(), x0 = n - winH * H, padL = 32, padR = 8, padT = 22, padB = 22;
+  const yMin = 40, yMax = 400;
+  const X = t => padL + (t - x0) / (n - x0) * (W - padL - padR);
+  const Y = v => padT + (1 - (v - yMin) / (yMax - yMin)) * (Hh - padT - padB);
+  let h = '';
+  h += `<rect x="${padL}" y="${Y(180)}" width="${W - padL - padR}" height="${Y(70) - Y(180)}" fill="var(--ok-tint)"/>`;
+  for (const v of [70, 180, 250]) h += `<line x1="${padL}" x2="${W - padR}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v === 250 ? 'var(--high)' : v === 70 ? 'var(--low)' : 'var(--line)'}" stroke-dasharray="3 4" stroke-width="1"/><text x="${padL - 5}" y="${Y(v) + 3}" text-anchor="end">${v}</text>`;
+  h += `<text x="${padL - 5}" y="${Y(400) + 3}" text-anchor="end">400</text><text x="${padL - 5}" y="${Y(40) + 3}" text-anchor="end">40</text>`;
+  const stepH = { 3: 1, 6: 1, 12: 3, 24: 4 }[winH];
+  const tick = new Date(x0); tick.setMinutes(0, 0, 0); tick.setHours(tick.getHours() + 1);
+  while (tick.getTime() < n) {
+    if (tick.getHours() % stepH === 0) { const xx = X(tick.getTime()); h += `<line x1="${xx}" x2="${xx}" y1="${padT}" y2="${Hh - padB}" stroke="var(--line)" stroke-width="1"/><text x="${xx}" y="${Hh - 6}" text-anchor="middle">${tick.toLocaleTimeString([], { hour: 'numeric' })}</text>`; }
+    tick.setHours(tick.getHours() + 1);
+  }
+  const col = { urgent: 'var(--low)', low: 'var(--low)', high: 'var(--high)', above: 'var(--high)', in: 'var(--ok)' };
+  const rr = winH <= 6 ? 2.6 : winH === 12 ? 2 : 1.6;
+  for (const p of SIM.pts) if (p.t >= x0) h += `<circle cx="${X(p.t).toFixed(1)}" cy="${Y(p.cgm).toFixed(1)}" r="${rr}" fill="${col[statusOf(p.cgm)]}"/>`;
+  for (const e of S.events) {
+    if (e.t < x0 || e.t > n) continue; const xx = X(e.t);
+    if (e.type === 'bolus') h += `<path d="M${xx} ${Hh - padB - 9} l5 5 -5 5 -5 -5z" fill="var(--accent)"/>`;
+    if (e.type === 'carbs' || e.type === 'treat') h += `<circle cx="${xx}" cy="${padT - 10}" r="4" fill="${e.type === 'treat' ? 'var(--low)' : 'var(--muted)'}"/>${winH <= 6 ? `<text x="${xx + 6}" y="${padT - 7}">${e.g}g</text>` : ''}`;
+  }
+  const last = curPt(); if (last) h += `<circle cx="${X(last.t)}" cy="${Y(last.cgm)}" r="5" fill="none" stroke="var(--ink)" stroke-width="2"/>`;
+  svg.innerHTML = h;
+}
+
+/* ---------- Alerts and notices ---------- */
+function computeAway() {
+  const since = S.lastSeen || 0, n = now();
+  if (n - since < 30 * MIN) return null;
+  const pts = SIM.pts.filter(p => p.t > since);
+  if (!pts.length) return null;
+  let lows = 0, highs = 0, inLow = 0, inHigh = 0, min = null;
+  for (const p of pts) {
+    inLow = p.cgm < CFG.LOW ? inLow + 1 : 0; if (inLow === 3) lows++; if (inLow && (!min || p.cgm < min.cgm)) min = p;
+    inHigh = p.cgm > CFG.HIGH ? inHigh + 1 : 0; if (inHigh === 3) highs++;
+  }
+  return { since, lows, highs, min, msgs: SCRIPT.msgs.filter(m => m.t > since && m.t <= n).length };
+}
+let awayInfo = null;
+
+function renderAlerts() {
+  const area = $('alertArea'); const n = now(); const p = curPt();
+  const parts = [];
+  const kind = p ? (p.cgm < CFG.URGENT ? 'urgent' : p.cgm < CFG.LOW ? 'low' : p.cgm > CFG.HIGH ? 'high' : null) : null;
+  const silenced = kind && S.silenced[kind] > n;
+  if (kind && !silenced) {
+    const txt = { urgent: ['Urgent low', 'Treat now with fast-acting carbs (15-15 rule), then recheck in 15 minutes.'], low: ['Low glucose', 'Below 70 mg/dL. Treat with 15 g of fast-acting carbs and recheck in 15 minutes.'], high: ['High glucose', 'Above 250 mg/dL. Think about a correction dose and possible causes.'] }[kind];
+    parts.push(`<div class="notice alert-${kind}" role="alert"><div class="grow"><strong>${txt[0]}: ${showVal(p.cgm)} mg/dL</strong><br><span style="font-size:.88rem">${txt[1]}</span></div><button class="btn small" type="button" data-silence="${kind}">Silence ${CFG.SNOOZE_MIN} min</button></div>`);
+  }
+  if (kind !== lastAlert) { if (kind && !silenced) playFor(kind); lastAlert = kind; }
+  else if (kind === 'urgent' && !silenced && Date.now() - lastBeep > 15000) playFor('urgent');
+  if (!kind) lastAlert = null;
+
+  const lk = activeLock(n);
+  if (lk) parts.push(`<div class="notice info"><div class="grow"><strong>No insulin with you.</strong> ${esc(lk.why)}</div></div>`);
+
+  const tr = S.events.filter(e => e.type === 'treat').sort((a, b) => b.t - a.t)[0];
+  if (tr && n >= tr.t + 15 * MIN && n < tr.t + 45 * MIN && !S.dismissed.includes('re' + tr.id)) {
+    parts.push(`<div class="notice info"><div class="grow"><strong>Time to recheck.</strong> It has been 15 minutes since you treated a low. If you are still under 70, treat again.</div><button class="btn small" type="button" data-dismiss="re${tr.id}">OK</button></div>`);
+  }
+  const un = unreadMsgs();
+  if (un.length) {
+    const m = un[un.length - 1];
+    parts.push(`<div class="notice info"><div class="grow"><strong>New message: ${esc(m.title)}</strong>${un.length > 1 ? `<br><span class="hint">${un.length} unread messages</span>` : ''}</div><button class="btn small primary" type="button" data-goto="msgs">Read</button></div>`);
+    const fresh = un.filter(x => !seenMsgIds.has(x.id));
+    if (fresh.length && msgInit) playFor('msg');
+    fresh.forEach(x => seenMsgIds.add(x.id));
+  }
+  if (awayInfo && !S.dismissed.includes('away' + awayInfo.since)) {
+    const a = awayInfo; const bits = [];
+    bits.push(a.lows && a.min ? `${a.lows} low${a.lows > 1 ? 's' : ''} (lowest ${showVal(a.min.cgm)} at ${fmtTime(a.min.t)})` : 'no lows');
+    bits.push(a.highs ? `${a.highs} high${a.highs > 1 ? 's' : ''} over 250` : 'no highs over 250');
+    parts.push(`<div class="notice"><div class="grow"><strong>While you were away</strong> <span class="hint">(since ${fmtTime(a.since)}${dayIndex(a.since) !== dayIndex(n) ? ', ' + fmtDay(a.since) : ''})</span><br>${bits.join(', ')}. Check the graph to see what happened.</div><button class="btn small" type="button" data-dismiss="away${a.since}">OK</button></div>`);
+  }
+  if (!storageOK) parts.push('<div class="notice alert-low"><div class="grow"><strong>This browser is not saving your data.</strong> Turn off private browsing and use the same browser all week.</div></div>');
+  const html = parts.join('');
+  if (area._h !== html) { area.innerHTML = html; area._h = html; }
+
+  const sv = SIM.severe.filter(t => t > (S.severeSeen || 0));
+  if (sv.length && !sheetOpen) { S.severeSeen = sv[sv.length - 1]; save(); openSevere(sv[sv.length - 1]); }
+}
+
+/* ---------- Messages ---------- */
+function renderMsgs() {
+  const list = arrivedMsgs().slice().reverse();
+  const el = $('tab-msgs');
+  if (!list.length) {
+    const next = SCRIPT.msgs.find(m => m.t > now());
+    el.innerHTML = `<h2>Messages</h2><div class="card empty">No messages yet.${next ? `<br>Your first message arrives ${fmtDayLong(next.t)} at ${fmtTime(next.t)}.` : ''}</div>`;
+    return;
+  }
+  const read = new Set(S.read);
+  let h = '<h2>Messages</h2><p class="hint">Answer each scenario and reflection in your journal.</p>', lastDay = null;
+  const tagTxt = { scenario: 'Scenario', reflect: 'Reflection', device: 'Sensor', surprise: 'Surprise', info: 'Info' };
+  for (const m of list) {
+    const day = fmtDayLong(m.t);
+    if (day !== lastDay) { h += `<p class="label dayhead">${day}</p>`; lastDay = day; }
+    h += `<article class="card msg"><div class="meta">${read.has(m.id) ? '' : '<span class="unread" aria-label="Unread"></span>'}<span class="tag ${m.kind}">${tagTxt[m.kind]}</span><span class="hint mono">${fmtTime(m.t)}</span></div><h3>${esc(m.title)}</h3><p>${esc(m.text)}</p></article>`;
+  }
+  el.innerHTML = h;
+  const ids = list.map(m => m.id).filter(id => !read.has(id));
+  if (ids.length) { S.read = S.read.concat(ids); save(); }
+}
+
+/* ---------- Log ---------- */
+function describe(e) {
+  switch (e.type) {
+    case 'carbs': return [`Carbs: ${e.g} g`, e.fat ? 'High fat or protein meal' : ''];
+    case 'bolus': return [`NovoLog: ${e.u} unit${e.u === 1 ? '' : 's'}`, ''];
+    case 'treat': return [`Treated a low: ${e.g} g fast carbs`, ''];
+    case 'finger': return [`Fingerstick: ${e.v} mg/dL`, ''];
+    case 'exercise': return [`Activity: ${e.min} min, ${e.intensity}`, e.what ? esc(e.what) : ''];
+    case 'alcohol': return [`Alcohol: ${e.n} drink${e.n === 1 ? '' : 's'}`, ''];
+    case 'caffeine': return [`Caffeine: ${e.n} serving${e.n === 1 ? '' : 's'}`, ''];
+    case 'stress': return [`Stress: ${e.level}`, ''];
+    case 'cycle': return [e.on ? 'Cycle: luteal phase started' : 'Cycle: period started (luteal phase ended)', ''];
+    case 'missedBasal': return ['Missed Lantus dose', ''];
+    case 'lateBasal': return [`Lantus taken ${e.h} hour${e.h === 1 ? '' : 's'} late`, ''];
+  }
+  return [e.type, ''];
+}
+let armedDelete = null;
+function renderLog() {
+  const el = $('tab-log');
+  const evs = S.events.filter(e => e.t <= now()).sort((a, b) => b.t - a.t);
+  if (!evs.length) { el.innerHTML = '<h2>Log</h2><div class="card empty">Nothing logged yet. Use the buttons on the Now tab to log carbs, insulin, activity, and more.</div>'; return; }
+  let h = '<h2>Log</h2>', lastDay = null, open = false;
+  for (const e of evs) {
+    const day = fmtDayLong(e.t);
+    if (day !== lastDay) { if (open) h += '</div>'; h += `<p class="label dayhead">${day}</p><div class="card" style="padding-block:4px">`; open = true; lastDay = day; }
+    const [a, b] = describe(e);
+    h += `<div class="logitem"><span class="t mono">${fmtTime(e.t)}</span><div class="what"><strong>${a}</strong>${b ? `<br><span class="hint">${b}</span>` : ''}</div><button class="btn small ${armedDelete === e.id ? 'danger armed' : 'ghost'}" type="button" data-del="${e.id}">${armedDelete === e.id ? 'Delete' : 'Remove'}</button></div>`;
+  }
+  if (open) h += '</div>';
+  el.innerHTML = h;
+}
+
+/* ---------- Report ---------- */
+function statRange(a, b) {
+  const sel = SIM.pts.filter(p => p.t >= a && p.t < b); if (!sel.length) return null;
+  let sum = 0, inR = 0, below = 0, above = 0, lows = 0, highs = 0, runL = 0, runH = 0;
+  for (const p of sel) {
+    sum += p.cgm; if (p.cgm >= 70 && p.cgm <= 180) inR++; if (p.cgm < 70) below++; if (p.cgm > 180) above++;
+    runL = p.cgm < 70 ? runL + 1 : 0; if (runL === 3) lows++;
+    runH = p.cgm > 250 ? runH + 1 : 0; if (runH === 3) highs++;
+  }
+  const n = sel.length;
+  return { avg: Math.round(sum / n), tir: Math.round(inR / n * 100), below: Math.round(below / n * 100), above: Math.round(above / n * 100), lows, highs, n, a, b,
+    carbs: S.events.filter(e => (e.type === 'carbs' || e.type === 'treat') && e.t >= a && e.t < b).reduce((s, e) => s + e.g, 0),
+    insulin: S.events.filter(e => e.type === 'bolus' && e.t >= a && e.t < b).reduce((s, e) => s + e.u, 0) };
+}
+function lowEpisodes() {
+  const out = []; let cur = null;
+  for (const p of SIM.pts) {
+    if (p.cgm < CFG.LOW) { if (!cur) cur = { t: p.t, n: 0, min: p.cgm, trueLow: false }; cur.n++; cur.min = Math.min(cur.min, p.cgm); if (p.g < CFG.LOW) cur.trueLow = true; }
+    else if (cur) { out.push(cur); cur = null; }
+  }
+  if (cur) out.push(cur); return out.filter(e => e.n >= 3);
+}
+function feedback() {
+  const fb = [], ev = S.events;
+  const boluses = ev.filter(e => e.type === 'bolus');
+  const meals = ev.filter(e => e.type === 'carbs' && e.g >= 15);
+  const unbolused = meals.filter(m => !boluses.some(b => Math.abs(b.t - m.t) <= 30 * MIN) && !activeLock(m.t));
+  if (meals.length) fb.push(unbolused.length ? `${unbolused.length} of ${meals.length} meals or snacks (15 g or more) had no insulin logged within 30 minutes. Missed or late meal doses are a common cause of highs.` : (meals.length === 1 ? 'You logged insulin within 30 minutes of your 1 meal.' : `You logged insulin within 30 minutes of all ${meals.length} meals and snacks.`) + ' Nice work matching insulin to carbs.');
+  else fb.push('You did not log any meals this week. Logging carbs is how the CGM reflects what you eat.');
+  const eps = lowEpisodes();
+  const real = eps.filter(e => e.trueLow);
+  const treats = ev.filter(e => e.type === 'treat');
+  if (real.length) {
+    const fast = real.filter(e => treats.some(t => t.t >= e.t - 5 * MIN && t.t <= e.t + 20 * MIN)).length;
+    fb.push(`You had ${real.length} low${real.length > 1 ? 's' : ''} under 70. You treated ${fast} of them within 20 minutes. Lows that go untreated can become dangerous quickly, especially overnight.`);
+  } else fb.push('You had no true lows under 70 this week.');
+  const rebounds = treats.filter(t => SIM.pts.some(p => p.t > t.t && p.t <= t.t + 2 * H && p.cgm > 180)).length;
+  if (treats.length) fb.push(rebounds ? `After ${rebounds} of your ${treats.length} low treatment${treats.length > 1 ? 's' : ''}, glucose went above 180 within 2 hours. That rebound often means too many carbs were used to treat. The 15-15 rule helps prevent it.` : `None of your low treatments (${treats.length}) led to a rebound high. The 15-15 rule worked.`);
+  const fats = ev.filter(e => e.type === 'carbs' && e.fat);
+  if (fats.length) { const late = fats.filter(m => SIM.pts.some(p => p.t >= m.t + 3 * H && p.t <= m.t + 5 * H && p.cgm > 180)).length; fb.push(`You logged ${fats.length} high fat or protein meal${fats.length > 1 ? 's' : ''}. ${late} of them were followed by a high 3 to 5 hours later: fat and protein slow digestion, so the rise comes late.`); }
+  if (SIM.severe.length) fb.push(`${SIM.severe.length} time${SIM.severe.length > 1 ? 's' : ''} your glucose fell to a severe low. In real life this could mean confusion, passing out, or a seizure, and someone would need to give glucagon or call 911.`);
+  const fingers = ev.filter(e => e.type === 'finger');
+  for (const r of SCRIPT.randoms) {
+    if (r.t > now() || r.t < S.profile.createdAt) continue;
+    const checked = fingers.some(f => f.t >= r.t && f.t <= r.t + 3 * H);
+    if (r.type === 'compression') fb.push(`On ${fmtDay(r.t)} around ${fmtTime(r.t)} your CGM showed a false low while you were asleep. This is a compression low: lying on the sensor squeezes the fluid around it. ${checked ? 'You checked with a fingerstick.' : 'A fingerstick would have shown your real glucose was fine.'}`);
+    if (r.type === 'inaccurate') fb.push(`On ${fmtDay(r.t)} your sensor read about 45 mg/dL too high for 3 hours. ${checked ? 'You confirmed with a fingerstick before dosing.' : 'You did not check with a fingerstick, so any correction dose in that window was based on a wrong number.'}`);
+  }
+  return fb;
+}
+
+function renderReport() {
+  const el = $('tab-report'); const P = S.profile, ws = P.weekStart, n = now();
+  const wkEnd = T(ws, 7, 0);
+  const startA = Math.max(ws, P.createdAt);
+  const wk = statRange(startA, Math.min(n, wkEnd) + 1);
+  const sod = new Date(n); sod.setHours(0, 0, 0, 0);
+  const today = statRange(Math.max(sod.getTime(), P.createdAt), n + 1);
+  const statCards = s => s ? `<div class="stats"><div class="stat"><div class="n">${s.avg}</div><div class="s">Average glucose, mg/dL</div></div><div class="stat"><div class="n">${s.tir}%</div><div class="s">Time in range (70 to 180)</div></div></div>
+    <div class="tirbar" aria-label="Time below, in, and above range"><i style="width:${s.below}%;background:var(--low)"></i><i style="width:${s.tir}%;background:var(--ok)"></i><i style="width:${s.above}%;background:var(--high)"></i></div>
+    <p class="hint">${s.below}% below 70, ${s.tir}% in range, ${s.above}% above 180. ${s.lows} low${s.lows === 1 ? '' : 's'}, ${s.highs} high${s.highs === 1 ? '' : 's'} over 250.</p>` : '<p class="muted">No readings yet.</p>';
+  let rows = '';
+  for (let d = 0; d < 7; d++) {
+    const s = statRange(Math.max(T(ws, d, 0), P.createdAt), Math.min(T(ws, d + 1, 0), n + 1));
+    if (!s || T(ws, d, 0) > n) continue;
+    rows += `<tr><td>${new Date(T(ws, d, 0)).toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' })}</td><td class="num">${s.avg}</td><td class="num">${s.tir}%</td><td class="num">${s.lows}</td><td class="num">${s.highs}</td><td class="num">${s.carbs} g</td><td class="num">${s.insulin} u</td></tr>`;
+  }
+  const showFb = S.test || n >= T(ws, 6, 0);
+  el.innerHTML = `
+    <div class="row" style="justify-content:space-between"><h2>Report</h2><span class="hint">${esc(P.name)}</span></div>
+    <div class="card stack"><h3>Today</h3>${statCards(today)}</div>
+    <div class="card stack"><h3>This week so far</h3>${statCards(wk)}
+      ${rows ? `<div class="tablewrap"><table><thead><tr><th>Day</th><th>Avg</th><th>In range</th><th>Lows</th><th>Highs</th><th>Carbs</th><th>NovoLog</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}</div>
+    <div class="card stack"><h3>End-of-week feedback</h3>${showFb ? `<ul class="fb">${feedback().map(f => `<li>${f}</li>`).join('')}</ul>${S.test && n < T(ws, 6, 0) ? '<p class="hint">Test mode preview. Students see this on Sunday.</p>' : ''}` : `<p class="muted">Your feedback appears on Sunday, ${fmtDay(T(ws, 6, 0))}.</p>`}</div>
+    <div class="card stack noprint"><h3>Export your report</h3>
+      <p class="hint">On Sunday night, save your report and upload it to Blackboard with your journal. The spreadsheet has every reading and log entry, labeled with your name.</p>
+      ${framed ? '' : '<button class="btn primary" type="button" id="dlCsv">Download spreadsheet (CSV)</button><button class="btn" type="button" id="printBtn">Save summary as PDF</button>'}
+      <button class="btn${framed ? ' primary' : ''}" type="button" id="copyCsv">Copy spreadsheet data</button>
+      <p class="hint" id="exportMsg" role="status"></p>
+    </div>`;
+}
+
+function csvText() {
+  const P = S.profile, q = s => `"${String(s).replace(/"/g, '""')}"`;
+  const rows = [['Name', 'Date', 'Time', 'Type', 'Value', 'Units', 'Details']];
+  const recs = SIM.pts.map(p => ({ t: p.t, type: 'CGM reading', v: p.cgm, u: 'mg/dL', d: STATUS_LABEL[statusOf(p.cgm)] }));
+  const unit = { carbs: 'g', treat: 'g', bolus: 'units', finger: 'mg/dL', exercise: 'min', alcohol: 'drinks', caffeine: 'servings', lateBasal: 'hours' };
+  const val = e => ({ carbs: e.g, treat: e.g, bolus: e.u, finger: e.v, exercise: e.min, alcohol: e.n, caffeine: e.n, lateBasal: e.h }[e.type] ?? '');
+  for (const e of S.events) recs.push({ t: e.t, type: describe(e)[0].split(':')[0], v: val(e), u: unit[e.type] || '', d: e.type === 'carbs' && e.fat ? 'High fat or protein' : e.type === 'exercise' ? e.intensity : e.type === 'stress' ? e.level : '' });
+  for (const m of SCRIPT.msgs) if (m.t <= now() && m.t >= P.createdAt - 12 * H) recs.push({ t: m.t, type: 'Message', v: '', u: '', d: m.title });
+  recs.sort((a, b) => a.t - b.t);
+  for (const r of recs) { const d = new Date(r.t); rows.push([P.name, d.toLocaleDateString(), d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), r.type, r.v, r.u, r.d]); }
+  return rows.map(r => r.map(q).join(',')).join('\n');
+}
+
+/* ---------- Sheets (forms) ---------- */
+const WHEN = `<label class="field"><span>When</span><select id="sWhen"><option value="0">Just now</option><option value="15">15 minutes ago</option><option value="30">30 minutes ago</option><option value="60">1 hour ago</option><option value="120">2 hours ago</option></select></label>`;
+function closeSheet() { sheetOpen = null; $('sheetRoot').innerHTML = ''; }
+function openSheet(kind, html, onSave, saveLabel = 'Save') {
+  sheetOpen = kind;
+  $('sheetRoot').innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><form id="sheetForm" class="stack" novalidate>${html}<p id="sErr" class="hint" style="color:var(--low)" hidden></p>${onSave ? `<button class="btn primary" type="submit">${saveLabel}</button>` : ''}<button class="btn" type="button" id="sCancel">${onSave ? 'Cancel' : 'Close'}</button></form></div></div>`;
+  $('scrim').addEventListener('click', e => { if (e.target.id === 'scrim') closeSheet(); });
+  $('sCancel').addEventListener('click', closeSheet);
+  $('sheetForm').addEventListener('submit', e => { e.preventDefault(); if (!onSave) return closeSheet(); const err = onSave(); if (err) { $('sErr').textContent = err; $('sErr').hidden = false; } });
+  const first = $('sheetForm').querySelector('input,select'); if (first) setTimeout(() => first.focus({ preventScroll: true }), 50);
+}
+const whenT = () => now() - (+($('sWhen') ? $('sWhen').value : 0)) * MIN;
+function addEvent(e) { e.id = uid(); S.events.push(e); save(); lastStep = -1; closeSheet(); refresh(true); }
+const numIn = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : NaN; };
+
+function openLog(kind) {
+  const n = now();
+  if (kind === 'carbs') openSheet(kind, `<div class="head"><h2 id="sheetTitle">Log carbs</h2></div>
+    <label class="field"><span>Carbohydrates (grams)</span><input type="number" id="sG" inputmode="numeric" min="1" max="300" step="1"></label>
+    <label class="check"><input type="checkbox" id="sFat"><span><strong>High fat or protein meal</strong><br><span class="hint">For example pizza, burgers, fried food. Glucose rises later and longer.</span></span></label>${WHEN}`,
+    () => { const g = Math.round(numIn('sG')); if (!(g > 0 && g <= 300)) return 'Enter grams of carbs between 1 and 300.'; addEvent({ type: 'carbs', t: whenT(), g, fat: $('sFat').checked }); });
+  if (kind === 'bolus') {
+    const lk = activeLock(n), left = supplyLeft(n);
+    if (lk) return openSheet(kind, `<div class="head"><h2 id="sheetTitle">Take NovoLog</h2></div><div class="notice alert-high"><div class="grow"><strong>No insulin with you.</strong> ${esc(lk.why)}</div></div>`, null);
+    openSheet(kind, `<div class="head"><h2 id="sheetTitle">Take NovoLog</h2></div>
+      <p class="hint">Calculate your own dose. Meal: 1 unit per 15 g carbs. Correction: 1 unit lowers 50 mg/dL, aiming for 120.</p>
+      <label class="field"><span>Units</span><input type="number" id="sU" inputmode="decimal" min="0.5" max="30" step="0.5"></label>
+      ${left != null ? `<p class="chip warn" style="align-self:flex-start">Units left in your pen: ${left}</p>` : ''}${WHEN}`,
+      () => { const u = Math.round(numIn('sU') * 2) / 2; if (!(u >= 0.5 && u <= 30)) return 'Enter a dose between 0.5 and 30 units, in half-unit steps.'; const l = supplyLeft(n); if (l != null && u > l) return `You only have ${l} units left in your pen.`; addEvent({ type: 'bolus', t: whenT(), u }); }, 'Log dose');
+  }
+  if (kind === 'treat') openSheet(kind, `<div class="head"><h2 id="sheetTitle">Treat a low</h2></div>
+    <p class="hint">The 15-15 rule: take 15 g of fast-acting carbs (4 oz juice, 4 glucose tablets, or 1 tablespoon sugar), then recheck in 15 minutes. Repeat if you are still under 70.</p>
+    <label class="field"><span>Fast-acting carbs (grams)</span><input type="number" id="sG" inputmode="numeric" min="1" max="100" step="1" value="15"></label>${WHEN}`,
+    () => { const g = Math.round(numIn('sG')); if (!(g > 0 && g <= 100)) return 'Enter grams between 1 and 100.'; addEvent({ type: 'treat', t: whenT(), g }); });
+  if (kind === 'finger') {
+    const fr = SCRIPT.fingers.find(f => n >= f.t0 && n < f.t1);
+    let v;
+    if (fr) { const k = S.events.filter(e => e.type === 'finger' && e.t >= fr.t0 && e.t < fr.t1).length; v = fr.vals[k] != null ? fr.vals[k] : Math.round(trueAt(n)); }
+    else { const r = Math.random(); v = Math.round(trueAt(n) * (1 + (r - .5) * 0.08)); }
+    v = Math.max(20, Math.min(600, v));
+    const e = { id: uid(), type: 'finger', t: n, v }; S.events.push(e); save(); refresh(true);
+    const cg = curPt();
+    openSheet(kind, `<div class="head"><h2 id="sheetTitle">Fingerstick result</h2></div><div class="card" style="text-align:center"><div class="result">${v}</div><div class="hint">mg/dL from your meter at ${fmtTime(n)}</div></div>${cg ? `<p class="hint">Your CGM currently reads ${showVal(cg.cgm)} mg/dL. A difference of more than about 20% means the sensor may be off.</p>` : ''}`, null);
+  }
+  if (kind === 'exercise') openSheet(kind, `<div class="head"><h2 id="sheetTitle">Log activity</h2></div>
+    <label class="field"><span>What did you do? (optional)</span><input type="text" id="sWhat" maxlength="60" placeholder="Walk, lifting, soccer"></label>
+    <label class="field"><span>Minutes</span><input type="number" id="sMin" inputmode="numeric" min="5" max="300" step="5"></label>
+    <div class="field"><span>Intensity</span><div class="seg" id="sInt" role="group" aria-label="Intensity"><button type="button" data-v="light" aria-pressed="false">Light</button><button type="button" data-v="moderate" aria-pressed="true">Moderate</button><button type="button" data-v="vigorous" aria-pressed="false">Vigorous</button></div></div>
+    <label class="field"><span>Started</span><select id="sWhen"><option value="0">Just now</option><option value="15">15 minutes ago</option><option value="30">30 minutes ago</option><option value="60">1 hour ago</option><option value="120">2 hours ago</option><option value="180">3 hours ago</option></select></label>`,
+    () => { const m = Math.round(numIn('sMin')); if (!(m >= 5 && m <= 300)) return 'Enter minutes between 5 and 300.'; const it = $('sInt').querySelector('[aria-pressed="true"]').dataset.v; addEvent({ type: 'exercise', t: whenT(), min: m, intensity: it, what: $('sWhat').value.trim() }); });
+  if (kind === 'more') {
+    const fem = S.profile.sex === 'Female';
+    let luteal = false; for (const e of S.events) if (e.type === 'cycle' && e.t <= n) luteal = !!e.on;
+    openSheet(kind, `<div class="head"><h2 id="sheetTitle">More to log</h2></div>
+      <div class="actions" style="grid-template-columns:1fr 1fr">
+        <button class="act" type="button" data-more="alcohol">Alcohol</button>
+        <button class="act" type="button" data-more="caffeine">Caffeine</button>
+        <button class="act" type="button" data-more="stress">Stress</button>
+        <button class="act" type="button" data-more="basal">Lantus missed or late</button>
+        ${fem ? `<button class="act" type="button" data-more="cycle">${luteal ? 'Period started' : 'Luteal phase started'}</button>` : ''}
+      </div>`, null);
+    $('sheetForm').addEventListener('click', ev => { const b = ev.target.closest('[data-more]'); if (b) openMore(b.dataset.more, luteal); });
+  }
+}
+function openMore(k, luteal) {
+  if (k === 'alcohol') openSheet(k, `<div class="head"><h2 id="sheetTitle">Log alcohol</h2></div><p class="hint">Alcohol can cause lows hours later, often overnight, because the liver releases less glucose. Log any carbs in the drinks separately.</p><label class="field"><span>Number of drinks</span><input type="number" id="sN" inputmode="numeric" min="1" max="10" step="1" value="1"></label>${WHEN}`,
+    () => { const v = Math.round(numIn('sN')); if (!(v >= 1 && v <= 10)) return 'Enter 1 to 10 drinks.'; addEvent({ type: 'alcohol', t: whenT(), n: v }); });
+  if (k === 'caffeine') openSheet(k, `<div class="head"><h2 id="sheetTitle">Log caffeine</h2></div><p class="hint">One serving is about one cup of coffee or one energy drink.</p><label class="field"><span>Servings</span><input type="number" id="sN" inputmode="numeric" min="1" max="6" step="1" value="1"></label>${WHEN}`,
+    () => { const v = Math.round(numIn('sN')); if (!(v >= 1 && v <= 6)) return 'Enter 1 to 6 servings.'; addEvent({ type: 'caffeine', t: whenT(), n: v }); });
+  if (k === 'stress') openSheet(k, `<div class="head"><h2 id="sheetTitle">Log stress</h2></div><p class="hint">Stress hormones raise glucose and make insulin work less well for a few hours.</p><div class="field"><span>How stressed?</span><div class="seg" id="sLvl" role="group" aria-label="Stress level"><button type="button" data-v="mild" aria-pressed="true">Mild</button><button type="button" data-v="high" aria-pressed="false">High</button></div></div>${WHEN}`,
+    () => addEvent({ type: 'stress', t: whenT(), level: $('sLvl').querySelector('[aria-pressed="true"]').dataset.v }));
+  if (k === 'basal') openSheet(k, `<div class="head"><h2 id="sheetTitle">Lantus missed or late</h2></div><p class="hint">Lantus runs automatically. Log here if you would have missed or delayed today's dose.</p>
+    <div class="field"><span>What happened?</span><div class="seg" id="sBas" role="group" aria-label="Lantus"><button type="button" data-v="missed" aria-pressed="true">Missed it</button><button type="button" data-v="late" aria-pressed="false">Took it late</button></div></div>
+    <label class="field"><span>Hours late (if late)</span><input type="number" id="sH" inputmode="numeric" min="1" max="12" step="1" value="3"></label>`,
+    () => { const v = $('sBas').querySelector('[aria-pressed="true"]').dataset.v; if (v === 'missed') return addEvent({ type: 'missedBasal', t: now() }); const h = Math.round(numIn('sH')); if (!(h >= 1 && h <= 12)) return 'Enter 1 to 12 hours.'; addEvent({ type: 'lateBasal', t: now(), h }); });
+  if (k === 'cycle') openSheet(k, `<div class="head"><h2 id="sheetTitle">Menstrual cycle</h2></div><p class="hint">${luteal ? 'Log when your period starts. Insulin needs usually drop back to normal.' : 'In the luteal phase (about the week before your period), insulin often works less well and glucose runs higher.'}</p>`,
+    () => addEvent({ type: 'cycle', t: now(), on: !luteal }), luteal ? 'Period started' : 'Luteal phase started');
+}
+
+function openSevere(t) {
+  openSheet('severe', `<div class="head"><h2 id="sheetTitle" style="color:var(--low)">Severe low</h2></div>
+    <div class="card modal-severe stack"><p><strong>At ${fmtTime(t)} your glucose dropped to a dangerous level.</strong></p>
+    <p>In real life, you could become confused, pass out, or have a seizure. You would not be able to treat yourself. Someone would need to give you glucagon or call 911.</p>
+    <p>Treat now with fast-acting carbs, then recheck in 15 minutes. This event is noted in your report.</p></div>`, () => { closeSheet(); openLog('treat'); }, 'Treat a low now');
+}
+
+function openProfile() {
+  const P = S.profile;
+  openSheet('profile', `<div class="head"><h2 id="sheetTitle">Profile</h2></div>
+    <div class="card stack" style="gap:6px">
+      <p><strong>${esc(P.name)}</strong></p>
+      <p class="hint">${P.age} years old, ${P.sex.toLowerCase()}, ${P.weightLb} lb, ${P.activity.toLowerCase()} activity</p>
+      <p class="hint">Type 1 diabetes, diagnosed 5 years ago</p>
+    </div>
+    <div class="card stack" style="gap:6px">
+      <p class="label">Your insulin plan</p>
+      <p>Lantus (glargine): ${lantusUnits(P.weightLb)} units once daily, automatic</p>
+      <p>NovoLog meal ratio: 1 unit per ${CFG.ICR} g carbs</p>
+      <p>Correction: 1 unit lowers ${CFG.CF} mg/dL, target ${CFG.TARGET}</p>
+      <p>Alerts: urgent low under ${CFG.URGENT}, low under ${CFG.LOW}, high over ${CFG.HIGH}</p>
+      <p class="hint">Week of ${fmtDay(P.weekStart)}. Started ${fmtDay(P.createdAt)} at ${fmtTime(P.createdAt)}.</p>
+    </div>
+    <div class="card stack">
+      <p class="label">Start over</p>
+      <p class="hint">Erases your readings, log, and messages on this phone. This can't be undone.</p>
+      <button class="btn danger" type="button" id="resetBtn">Erase everything</button>
+    </div>
+    ${S.test ? '<button class="btn" type="button" id="testOff">Leave test mode</button>' : ''}
+    <p class="hint">For educational use only. Not medical advice. Do not use to make decisions about real diabetes care.</p>`, null);
+  let armed = false;
+  $('resetBtn').addEventListener('click', e => {
+    if (!armed) { armed = true; e.target.classList.add('armed'); e.target.textContent = 'Tap again to erase'; return; }
+    try { localStorage.removeItem(KEY); } catch (_) {}
+    S = null; closeSheet(); showSetup();
+  });
+  if ($('testOff')) $('testOff').addEventListener('click', () => { S.test = false; setClock(now(), 1); closeSheet(); refresh(true); });
+}
+
+/* ---------- Setup ---------- */
+function showSetup() {
+  $('main').hidden = true; $('setup').hidden = false;
+  const sel = $('fWeek'); sel.innerHTML = '';
+  const today = new Date(); const thisMon = mondayOf(today);
+  const opts = [];
+  const isMon = today.getDay() === 1;
+  opts.push({ t: thisMon.getTime(), label: fmtDayLong(thisMon) + (isMon ? ' (today)' : ' (already started)') });
+  for (let i = 1; i <= 3; i++) { const d = new Date(thisMon); d.setDate(d.getDate() + 7 * i); opts.push({ t: d.getTime(), label: fmtDayLong(d) }); }
+  for (const o of opts) sel.insertAdjacentHTML('beforeend', `<option value="${o.t}">${o.label}</option>`);
+  sel.value = String(isMon ? opts[0].t : opts[1].t);
+  const upd = () => { const w = parseFloat($('fWeight').value); $('fLantus').textContent = w > 0 ? lantusUnits(w) : '?'; };
+  $('fWeight').oninput = upd; upd();
+}
+$('setupForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('fName').value.trim(), age = parseInt($('fAge').value, 10), w = parseFloat($('fWeight').value);
+  const err = !name ? 'Enter your name.' : !(age >= 16 && age <= 90) ? 'Enter your age (16 to 90).' : !(w >= 80 && w <= 450) ? 'Enter your weight in pounds (80 to 450).' : !$('fAgree').checked ? 'Check the box to confirm this is for education only.' : '';
+  if (err) { $('setupErr').textContent = err; $('setupErr').hidden = false; return; }
+  const seed = (Math.random() * 2 ** 31) >>> 0;
+  const createdAt = Date.now();
+  const startBG = CFG.START_MIN + Math.round(rng(seed ^ 0xabc)() * (CFG.START_MAX - CFG.START_MIN));
+  S = defaultState({ name, age, sex: $('fSex').value, weightLb: Math.round(w), activity: $('fActivity').value, weekStart: +$('fWeek').value, createdAt, startBG, seed });
+  if (location.hash === '#test') S.test = true;
+  save(); startMain();
+});
+
+/* ---------- Main loop ---------- */
+function refresh(force) {
+  if (!S) return;
+  const n = now(), step = Math.floor(n / STEP);
+  if (force || step !== lastStep) { SIM = simulate(n); lastStep = step; }
+  renderHeader();
+  if (tab === 'now') renderNow();
+  renderAlerts();
+  if (tab === 'report' && (force || step !== lastStep)) renderReport();
+}
+let saveTick = 0;
+function tick() {
+  if (!S || $('main').hidden) return;
+  const before = lastStep;
+  refresh(false);
+  if (tab === 'msgs' && unreadMsgs().length) renderMsgs();
+  if (tab === 'report' && lastStep !== before) renderReport();
+  if (++saveTick % 15 === 0 && document.visibilityState === 'visible') { S.lastSeen = now(); save(); }
+}
+function setTab(t) {
+  tab = t;
+  for (const id of ['now', 'msgs', 'log', 'report']) $('tab-' + id).hidden = id !== t;
+  document.querySelectorAll('.tabbar button').forEach(b => { if (b.dataset.tab === t) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  if (t === 'msgs') renderMsgs(); if (t === 'log') { armedDelete = null; renderLog(); } if (t === 'report') renderReport(); if (t === 'now') renderNow();
+  renderHeader(); window.scrollTo(0, 0);
+}
+function startMain() {
+  $('setup').hidden = true; $('main').hidden = false;
+  SCRIPT = buildScript(S.profile);
+  lastStep = -1; refresh(true);
+  awayInfo = computeAway();
+  unreadMsgs().forEach(m => seenMsgIds.add(m.id));
+  msgInit = true;
+  S.lastSeen = now(); save();
+  setTab('now'); renderAlerts(); updateSoundBar();
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tab) return setTab(b.dataset.tab);
+  if (b.dataset.log) return openLog(b.dataset.log);
+  if (b.dataset.goto) return setTab(b.dataset.goto);
+  if (b.dataset.silence) { S.silenced[b.dataset.silence] = now() + CFG.SNOOZE_MIN * MIN; save(); return renderAlerts(); }
+  if (b.dataset.dismiss) { S.dismissed.push(b.dataset.dismiss); if (b.dataset.dismiss.startsWith('away')) { awayInfo = null; S.lastSeen = now(); } save(); return renderAlerts(); }
+  if (b.dataset.del) {
+    if (armedDelete !== b.dataset.del) { armedDelete = b.dataset.del; return renderLog(); }
+    S.events = S.events.filter(x => x.id !== b.dataset.del); armedDelete = null; save(); refresh(true); return renderLog();
+  }
+  if (b.dataset.h) { winH = +b.dataset.h; try { localStorage.setItem(KEY + '.win', winH); } catch (_) {} document.querySelectorAll('#winSeg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); return renderGraph(); }
+  if (b.dataset.speed && S) { setClock(now(), +b.dataset.speed); return refresh(true); }
+  const seg = b.closest('.seg'); if (seg && b.dataset.v) { seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); return; }
+  if (b.id === 'profileBtn') return openProfile();
+  if (b.id === 'jump1') { setClock(now() + H, S.clock.speed); return refresh(true); }
+  if (b.id === 'jumpNext') { const nx = SCRIPT.msgs.find(m => m.t > now() + 1000); if (nx) { setClock(nx.t + 1000, S.clock.speed); refresh(true); } return; }
+  if (b.id === 'copyCsv') {
+    const txt = csvText();
+    const done = ok => { $('exportMsg').textContent = ok ? 'Copied. Paste it into a blank spreadsheet or email.' : 'Copy did not work in this browser. Use Download instead.'; };
+    try { navigator.clipboard.writeText(txt).then(() => done(true), () => done(false)); } catch (_) { done(false); }
+    return;
+  }
+  if (b.id === 'dlCsv') {
+    try {
+      const blob = new Blob([csvText()], { type: 'text/csv' }); const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `PracticeCGM_${S.profile.name.replace(/[^A-Za-z0-9]+/g, '_')}.csv`;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      $('exportMsg').textContent = 'Spreadsheet saved to your downloads.';
+    } catch (_) { $('exportMsg').textContent = 'Download did not work. Try Copy spreadsheet data.'; }
+    return;
+  }
+  if (b.id === 'printBtn') { try { window.print(); } catch (_) {} return; }
+});
+let brandTaps = 0, brandTimer = null;
+$('brand').addEventListener('click', () => {
+  brandTaps++; clearTimeout(brandTimer); brandTimer = setTimeout(() => brandTaps = 0, 1500);
+  if (brandTaps >= 5 && S) { brandTaps = 0; S.test = !S.test; if (!S.test) setClock(now(), 1); save(); refresh(true); if (tab === 'report') renderReport(); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (!S || $('main').hidden) return;
+  if (document.visibilityState === 'hidden') { S.lastSeen = now(); save(); }
+  else { refresh(true); awayInfo = computeAway(); renderAlerts(); }
+});
+window.addEventListener('resize', () => { if (S && tab === 'now') renderGraph(); });
+
+/* ---------- Boot ---------- */
+try { const w = +localStorage.getItem(KEY + '.win'); if ([3, 6, 12, 24].includes(w)) winH = w; } catch (_) {}
+document.querySelectorAll('#winSeg button').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.h === winH)));
+try { localStorage.setItem(KEY + '.probe', '1'); localStorage.removeItem(KEY + '.probe'); } catch (_) { storageOK = false; }
+if (S && S.profile) { if (location.hash === '#test') S.test = true; startMain(); } else showSetup();
+setInterval(tick, 1000);
+window.__cgm = { get S() { return S; }, simulate: u => simulate(u), now, CFG };
+})();
+</script>
+
+</body>
+</html>
